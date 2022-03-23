@@ -6,11 +6,13 @@ use serenity::{
 };
 use std::collections::HashMap;
 
+#[derive(Default)]
 pub struct Framework<'a> {
     pub commands: CommandMap<'a>,
 }
 
 impl<'a> Framework<'a> {
+    #[must_use]
     pub fn new() -> Self {
         Framework {
             commands: HashMap::new(),

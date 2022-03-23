@@ -3,20 +3,20 @@ use quote::quote;
 use syn::{Attribute, Block, Error, ItemFn, Lit, Meta, MetaNameValue};
 
 #[derive(Default, Debug)]
-pub struct CommandInfo {
+pub struct Info {
     pub description: String,
 }
 
-pub fn parse_command(input: ItemFn) -> syn::Result<TokenStream> {
+pub fn parse(input: ItemFn) -> syn::Result<TokenStream> {
     let ItemFn {
         attrs, sig, block, ..
     } = input;
 
-    let mut command_info = CommandInfo::default();
+    let mut info = Info::default();
 
-    parse_attributes(&attrs, &mut command_info)?;
+    parse_attributes(&attrs, &mut info)?;
 
-    let description = command_info.description;
+    let description = info.description;
     let ident = sig.ident.clone();
     let name = sig.ident.to_string();
 
@@ -42,21 +42,18 @@ fn generate_closure(block: &Block) -> TokenStream {
     }
 }
 
-fn parse_attributes(attrs: &[Attribute], command_info: &mut CommandInfo) -> syn::Result<()> {
+fn parse_attributes(attrs: &[Attribute], command_info: &mut Info) -> syn::Result<()> {
     for attr in attrs {
         let ident = attr.path.get_ident().unwrap();
         let name = ident.to_string();
 
-        match name.as_str() {
-            "description" => {
-                let meta = attr.parse_meta()?;
-                command_info.description = parse_description(meta)?;
-            }
-            _ => {
-                let error = Error::new_spanned(attr, "Unknown attribute");
-                return Err(error);
-            }
-        };
+        if name.as_str() == "description" {
+            let meta = attr.parse_meta()?;
+            command_info.description = parse_description(&meta)?;
+        } else {
+            let error = Error::new_spanned(attr, "Unknown attribute");
+            return Err(error);
+        }
     }
 
     assert!(
@@ -67,9 +64,9 @@ fn parse_attributes(attrs: &[Attribute], command_info: &mut CommandInfo) -> syn:
     Ok(())
 }
 
-fn parse_description(meta: syn::Meta) -> syn::Result<String> {
+fn parse_description(meta: &syn::Meta) -> syn::Result<String> {
     if let Meta::NameValue(MetaNameValue {
-        lit: Lit::Str(ref lit_str),
+        lit: Lit::Str(lit_str),
         ..
     }) = meta
     {

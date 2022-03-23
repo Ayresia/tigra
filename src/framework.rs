@@ -1,5 +1,5 @@
-use serenity::prelude::RwLock;
 use crate::{command::Command, CommandMap};
+use serenity::prelude::RwLock;
 use serenity::{
     client::Context, model::interactions::application_command::ApplicationCommand,
     prelude::TypeMapKey,
@@ -22,9 +22,7 @@ impl<'a> Framework<'a> {
 
         if !self.commands.contains_key(cmd.name) {
             ApplicationCommand::create_global_application_command(&ctx.http, |command| {
-                command
-                    .name(cmd.name)
-                    .description(cmd.description)
+                command.name(cmd.name).description(cmd.description)
             })
             .await
             .expect("Unable to create command");

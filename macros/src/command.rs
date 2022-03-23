@@ -59,22 +59,37 @@ fn parse_attributes(attrs: &[Attribute], command_info: &mut CommandInfo) -> syn:
         };
     }
 
-    if command_info.description.is_empty() {
-        panic!("Missing command description");
-    }
+    assert!(
+        !command_info.description.is_empty(),
+        "Missing command description"
+    );
 
     Ok(())
 }
 
 fn parse_description(meta: syn::Meta) -> syn::Result<String> {
     if let Meta::NameValue(MetaNameValue {
-        lit: Lit::Str(lit_str),
+        lit: Lit::Str(ref lit_str),
         ..
     }) = meta
     {
-        return Ok(lit_str.value());
+        let val = lit_str.value();
+        let val_len = val.trim().len();
+
+        if val_len < 1 {
+            let error = Error::new_spanned(&meta, "Description must be atleast a character long");
+
+            return Err(error);
+        } else if val_len > 100 {
+            let error = Error::new_spanned(&meta, "Description must be less than 100 characters");
+
+            return Err(error);
+        }
+
+        return Ok(val);
     }
 
-    let error = Error::new_spanned(meta, "Unable to parse description");
+    let error = Error::new_spanned(&meta, "Unable to parse description");
+
     Err(error)
 }

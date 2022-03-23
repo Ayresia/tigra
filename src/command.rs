@@ -1,5 +1,7 @@
-use serenity::{model::interactions::application_command::ApplicationCommandInteraction, client::Context};
 use crate::FnPtr;
+use serenity::{
+    client::Context, model::interactions::application_command::ApplicationCommandInteraction,
+};
 
 pub struct Command<'a> {
     pub name: &'a str,

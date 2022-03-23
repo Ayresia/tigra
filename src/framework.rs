@@ -21,13 +21,10 @@ impl<'a> Framework<'a> {
         let cmd = command_ptr();
 
         if !self.commands.contains_key(cmd.name) {
-            let cloned_options = cmd.options.clone();
-
             ApplicationCommand::create_global_application_command(&ctx.http, |command| {
                 command
                     .name(cmd.name)
                     .description(cmd.description)
-                    .set_options(cloned_options)
             })
             .await
             .expect("Unable to create command");

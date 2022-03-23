@@ -1,0 +1,16 @@
+[package]
+name = "tigra"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+[dependencies.serenity]
+default-features = false
+version = "0.10"
+
+# Serenity features might change, although for now we are going 
+# to use these, and then check whether we still need them or not
+features = ["client", "gateway", "rustls_backend", "model", "unstable_discord_api"]

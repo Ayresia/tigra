@@ -1,6 +1,8 @@
 mod argument;
 mod info;
 
+use self::argument::{parse_arg_option_type, Argument};
+use argument::generate_args;
 use info::Info;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -8,7 +10,10 @@ use syn::{Attribute, Block, Error, ItemFn, Lit, Meta, MetaNameValue};
 
 pub fn parse(input: ItemFn) -> syn::Result<TokenStream> {
     let ItemFn {
-        attrs, sig, block, ..
+        attrs,
+        sig,
+        mut block,
+        ..
     } = input;
 
     let mut info = Info::default();
@@ -23,17 +28,45 @@ pub fn parse(input: ItemFn) -> syn::Result<TokenStream> {
     }
 
     let args = argument::parse_args(&sig.inputs)?;
-    let fn_closure = generate_closure(&block, &args);
+    let (closure_args, args) = args.split_at(2);
+
+    let fn_closure = generate_closure(&mut block, closure_args, args)?;
+    let options = generate_options(args)?;
 
     Ok(quote! {
         pub fn #ident<'a>() -> tigra::command::Command<'a> {
             tigra::command::Command::new(#name, #description, #fn_closure)
+            #(#options)*
         }
     })
 }
 
-fn generate_closure(block: &Block, args: &[argument::Argument]) -> TokenStream {
-    let args: Vec<TokenStream> = args
+pub fn generate_add_option(name: &str, kind: &TokenStream, required: bool) -> TokenStream {
+    // TODO: add description field
+    quote!(.add_option(#name, "This is a description", #kind, #required))
+}
+
+fn generate_options(args: &[Argument]) -> syn::Result<Vec<TokenStream>> {
+    let mut tmp = Vec::new();
+
+    for arg in args {
+        let name = arg.ident.to_string();
+        let required = arg.option;
+        let parse_kind = parse_arg_option_type(arg.ty)?;
+        let quote = generate_add_option(&name, &parse_kind, !required);
+
+        tmp.push(quote);
+    }
+
+    Ok(tmp)
+}
+
+fn generate_closure(
+    block: &mut Block,
+    closure_args: &[argument::Argument],
+    args: &[argument::Argument],
+) -> syn::Result<TokenStream> {
+    let closure_args: Vec<TokenStream> = closure_args
         .iter()
         .map(|arg| {
             let ident = &arg.ident;
@@ -47,18 +80,22 @@ fn generate_closure(block: &Block, args: &[argument::Argument]) -> TokenStream {
         })
         .collect();
 
-    quote! {
-        |#(#args,)*| {
-            Box::pin(async move #block)
+    let generated_args = generate_args(args)?;
+
+    Ok(quote! {
+        |#(#closure_args,)*| {
+            Box::pin(async move {
+                #(#generated_args)*
+                #block
+            })
         }
-    }
+    })
 }
 
 fn parse_attributes(attrs: &[Attribute], command_info: &mut Info) -> syn::Result<()> {
     for attr in attrs {
         let ident = attr.path.get_ident().unwrap();
         let name = ident.to_string();
-
         if name.as_str() == "description" {
             let meta = attr.parse_meta()?;
             command_info.description = parse_description(&meta)?;

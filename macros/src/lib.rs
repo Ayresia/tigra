@@ -1,5 +1,6 @@
 extern crate proc_macro;
 mod command;
+mod util;
 
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, ItemFn};

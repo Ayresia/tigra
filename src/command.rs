@@ -52,7 +52,7 @@ impl<'a> Command<'a> {
 
 /// # Panics
 /// Panics if one of the condition fails, this ensures that what
-/// the user is imputting is in the right length
+/// the user is inputting is in the right length
 pub fn check_option_inputs<'a>(name: &'a str, description: &'a str) {
     assert!(
         name.trim().is_empty(),

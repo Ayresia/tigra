@@ -10,7 +10,7 @@ pub struct Info {
 pub struct Argument<'a> {
     pub ident: &'a Ident,
     pub ty: &'a Type,
-    pub is_ref: bool
+    pub is_ref: bool,
 }
 
 pub fn parse(input: ItemFn) -> syn::Result<TokenStream> {
@@ -31,7 +31,7 @@ pub fn parse(input: ItemFn) -> syn::Result<TokenStream> {
         return Err(error);
     }
 
-    let args = parse_args(&sig.inputs);
+    let args = parse_args(&sig.inputs)?;
     let fn_closure = generate_closure(&block, &args);
 
     Ok(quote! {
@@ -43,7 +43,7 @@ pub fn parse(input: ItemFn) -> syn::Result<TokenStream> {
 
 fn parse_args(
     fn_args: &syn::punctuated::Punctuated<FnArg, syn::token::Comma>,
-) -> Vec<Argument> {
+) -> syn::Result<Vec<Argument>> {
     let mut tmp = Vec::new();
 
     for arg in fn_args {
@@ -53,7 +53,10 @@ fn parse_args(
             let ident = if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
                 &pat_ident.ident
             } else {
-                unimplemented!();
+                return Err(syn::Error::new_spanned(
+                    pat_type,
+                    "Expecting a ident",
+                ))
             };
 
             let pat_type = &*pat_type.ty;
@@ -62,28 +65,36 @@ fn parse_args(
                 Type::Reference(ty_ref) => {
                     is_ref = true;
                     &*ty_ref.elem
-                },
-                _ => unimplemented!(),
+                }
+                _ => {
+                    return Err(syn::Error::new_spanned(
+                        pat_type,
+                        "Expecting a path or a reference",
+                    ))
+                }
             };
 
             tmp.push(Argument { ident, ty, is_ref });
         }
     }
 
-    tmp
+    Ok(tmp)
 }
 
 fn generate_closure(block: &Block, args: &[Argument]) -> TokenStream {
-    let args: Vec<TokenStream> = args.iter().map(|arg| {
-        let ident = &arg.ident;
-        let ty = arg.ty;
+    let args: Vec<TokenStream> = args
+        .iter()
+        .map(|arg| {
+            let ident = &arg.ident;
+            let ty = arg.ty;
 
-        if arg.is_ref {
-            return quote!(#ident: &#ty);
-        }
+            if arg.is_ref {
+                return quote!(#ident: &#ty);
+            }
 
-        quote!(#ident: #ty)
-    }).collect();
+            quote!(#ident: #ty)
+        })
+        .collect();
 
     quote! {
         |#(#args,)*| {

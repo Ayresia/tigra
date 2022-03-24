@@ -1,12 +1,16 @@
-use std::collections::HashMap;
-
-use proc_macro2::{TokenStream, Ident};
+use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use syn::{Attribute, Block, Error, FnArg, ItemFn, Lit, Meta, MetaNameValue, Type};
 
 #[derive(Default, Debug)]
 pub struct Info {
     pub description: String,
+}
+
+pub struct Argument<'a> {
+    pub ident: &'a Ident,
+    pub ty: &'a Type,
+    pub is_ref: bool
 }
 
 pub fn parse(input: ItemFn) -> syn::Result<TokenStream> {
@@ -39,43 +43,47 @@ pub fn parse(input: ItemFn) -> syn::Result<TokenStream> {
 
 fn parse_args(
     fn_args: &syn::punctuated::Punctuated<FnArg, syn::token::Comma>,
-) -> HashMap<&Ident, String> {
-    let mut tmp = HashMap::new();
+) -> Vec<Argument> {
+    let mut tmp = Vec::new();
 
     for arg in fn_args {
         if let FnArg::Typed(pat_type) = arg {
-            let arg_name = if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
+            let mut is_ref = false;
+
+            let ident = if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
                 &pat_ident.ident
             } else {
-                unimplemented!()
+                unimplemented!();
             };
 
             let pat_type = &*pat_type.ty;
-
-            let arg_type = match pat_type {
-                Type::Path(_) => path_to_string(pat_type),
-                Type::Reference(ty_ref) => path_to_string(&ty_ref.elem),
+            let ty = match pat_type {
+                Type::Path(_) => pat_type,
+                Type::Reference(ty_ref) => {
+                    is_ref = true;
+                    &*ty_ref.elem
+                },
                 _ => unimplemented!(),
             };
 
-            tmp.insert(arg_name, arg_type);
+            tmp.push(Argument { ident, ty, is_ref });
         }
     }
 
     tmp
 }
 
-fn path_to_string(pat_type: &Type) -> String {
-    if let Type::Path(type_path) = pat_type {
-        let path = &type_path.path;
-        return path.get_ident().unwrap().to_string();
-    }
+fn generate_closure(block: &Block, args: &[Argument]) -> TokenStream {
+    let args: Vec<TokenStream> = args.iter().map(|arg| {
+        let ident = &arg.ident;
+        let ty = arg.ty;
 
-    unimplemented!()
-}
+        if arg.is_ref {
+            return quote!(#ident: &#ty);
+        }
 
-fn generate_closure(block: &Block, args: &HashMap<&Ident, String>) -> TokenStream {
-    let args: Vec<&Ident> = args.iter().map(|(k, _)| *k).collect();
+        quote!(#ident: #ty)
+    }).collect();
 
     quote! {
         |#(#args,)*| {

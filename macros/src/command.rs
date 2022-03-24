@@ -1,6 +1,8 @@
-use proc_macro2::TokenStream;
+use std::collections::HashMap;
+
+use proc_macro2::{TokenStream, Ident};
 use quote::quote;
-use syn::{Attribute, Block, Error, ItemFn, Lit, Meta, MetaNameValue};
+use syn::{Attribute, Block, Error, FnArg, ItemFn, Lit, Meta, MetaNameValue, Type};
 
 #[derive(Default, Debug)]
 pub struct Info {
@@ -25,7 +27,8 @@ pub fn parse(input: ItemFn) -> syn::Result<TokenStream> {
         return Err(error);
     }
 
-    let fn_closure = generate_closure(&block);
+    let args = parse_args(&sig.inputs);
+    let fn_closure = generate_closure(&block, &args);
 
     Ok(quote! {
         pub fn #ident<'a>() -> tigra::command::Command<'a> {
@@ -34,9 +37,48 @@ pub fn parse(input: ItemFn) -> syn::Result<TokenStream> {
     })
 }
 
-fn generate_closure(block: &Block) -> TokenStream {
+fn parse_args(
+    fn_args: &syn::punctuated::Punctuated<FnArg, syn::token::Comma>,
+) -> HashMap<&Ident, String> {
+    let mut tmp = HashMap::new();
+
+    for arg in fn_args {
+        if let FnArg::Typed(pat_type) = arg {
+            let arg_name = if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
+                &pat_ident.ident
+            } else {
+                unimplemented!()
+            };
+
+            let pat_type = &*pat_type.ty;
+
+            let arg_type = match pat_type {
+                Type::Path(_) => path_to_string(pat_type),
+                Type::Reference(ty_ref) => path_to_string(&ty_ref.elem),
+                _ => unimplemented!(),
+            };
+
+            tmp.insert(arg_name, arg_type);
+        }
+    }
+
+    tmp
+}
+
+fn path_to_string(pat_type: &Type) -> String {
+    if let Type::Path(type_path) = pat_type {
+        let path = &type_path.path;
+        return path.get_ident().unwrap().to_string();
+    }
+
+    unimplemented!()
+}
+
+fn generate_closure(block: &Block, args: &HashMap<&Ident, String>) -> TokenStream {
+    let args: Vec<&Ident> = args.iter().map(|(k, _)| *k).collect();
+
     quote! {
-        |ctx, interaction| {
+        |#(#args,)*| {
             Box::pin(async move #block)
         }
     }
@@ -87,6 +129,5 @@ fn parse_description(meta: &syn::Meta) -> syn::Result<String> {
     }
 
     let error = Error::new_spanned(&meta, "Unable to parse description");
-
     Err(error)
 }

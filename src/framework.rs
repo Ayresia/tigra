@@ -24,7 +24,10 @@ impl<'a> Framework<'a> {
 
         if !self.commands.contains_key(cmd.name) {
             ApplicationCommand::create_global_application_command(&ctx.http, |command| {
-                command.name(cmd.name).description(cmd.description)
+                command
+                    .name(cmd.name)
+                    .description(cmd.description)
+                    .set_options(cmd.options.clone())
             })
             .await
             .expect("Unable to create command");

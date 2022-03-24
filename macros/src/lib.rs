@@ -1,5 +1,4 @@
 extern crate proc_macro;
-
 mod command;
 
 use proc_macro::TokenStream;

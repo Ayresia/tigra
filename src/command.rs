@@ -55,21 +55,21 @@ impl<'a> Command<'a> {
 /// the user is inputting is in the right length
 pub fn check_option_inputs<'a>(name: &'a str, description: &'a str) {
     assert!(
-        name.trim().is_empty(),
+        !name.trim().is_empty(),
         "Option name must be atleast a character long"
     );
 
     assert!(
-        (name.trim().len() > 32),
+        !(name.trim().len() > 32),
         "Option name must be less than 32 characters"
     );
 
     assert!(
-        description.trim().is_empty(),
+        !description.trim().is_empty(),
         "Option description must be atleast a character long"
     );
     assert!(
-        (description.trim().len() > 100),
+        !(description.trim().len() > 100),
         "Option description must be less than 100 characters"
     );
 }

@@ -11,8 +11,7 @@ pub fn parse(input: ItemFn) -> syn::Result<TokenStream> {
         attrs, sig, block, ..
     } = input;
 
-    let mut info = info::Info::default();
-
+    let mut info = Info::default();
     parse_attributes(&attrs, &mut info)?;
 
     let description = info.description;
@@ -40,7 +39,7 @@ fn generate_closure(block: &Block, args: &[argument::Argument]) -> TokenStream {
             let ident = &arg.ident;
             let ty = arg.ty;
 
-            if arg.is_ref {
+            if arg.reference {
                 return quote!(#ident: &#ty);
             }
 

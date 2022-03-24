@@ -1,10 +1,11 @@
 use proc_macro2::Ident;
-use syn::{punctuated::Punctuated, token::Comma, FnArg, Type};
+use syn::{punctuated::Punctuated, token::Comma, FnArg, Type, TypePath};
 
 pub struct Argument<'a> {
     pub ident: &'a Ident,
     pub ty: &'a Type,
-    pub is_ref: bool,
+    pub reference: bool,
+    pub option: bool,
 }
 
 pub fn parse_args(fn_args: &Punctuated<FnArg, Comma>) -> syn::Result<Vec<Argument>> {
@@ -13,6 +14,7 @@ pub fn parse_args(fn_args: &Punctuated<FnArg, Comma>) -> syn::Result<Vec<Argumen
     for arg in fn_args {
         if let FnArg::Typed(pat_type) = arg {
             let mut is_ref = false;
+            let mut option = false;
 
             let ident = if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
                 &pat_ident.ident
@@ -22,7 +24,10 @@ pub fn parse_args(fn_args: &Punctuated<FnArg, Comma>) -> syn::Result<Vec<Argumen
 
             let pat_type = &*pat_type.ty;
             let ty = match pat_type {
-                Type::Path(_) => pat_type,
+                Type::Path(ty_path) => {
+                    option = check_path_option(ty_path);
+                    pat_type
+                }
                 Type::Reference(ty_ref) => {
                     is_ref = true;
                     &*ty_ref.elem
@@ -35,9 +40,21 @@ pub fn parse_args(fn_args: &Punctuated<FnArg, Comma>) -> syn::Result<Vec<Argumen
                 }
             };
 
-            tmp.push(Argument { ident, ty, is_ref });
+            tmp.push(Argument {
+                ident,
+                ty,
+                reference: is_ref,
+                option,
+            });
         }
     }
 
     Ok(tmp)
+}
+
+fn check_path_option(ty_path: &TypePath) -> bool {
+    let path = &ty_path.path;
+    let ident = &path.segments[0].ident;
+
+    ident.to_string().starts_with("Option")
 }

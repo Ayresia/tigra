@@ -61,7 +61,6 @@ pub fn parse_args(fn_args: &Punctuated<FnArg, Comma>) -> syn::Result<Vec<Argumen
 
 macro_rules! generate_parse_arg {
     ($name: ident, $enum: ident, $ty: ident) => {
-        // TODO: add user
         match $name.as_str() {
             "String" => Ok(quote!(
                 serenity::model::interactions::application_command::$enum::String
@@ -71,6 +70,9 @@ macro_rules! generate_parse_arg {
             )),
             "bool" => Ok(quote!(
                 serenity::model::interactions::application_command::$enum::Boolean
+            )),
+            "User" => Ok(quote!(
+                serenity::model::interactions::application_command::$enum::User
             )),
             "PartialChannel" => Ok(quote!(
                 serenity::model::interactions::application_command::$enum::Channel
@@ -85,7 +87,15 @@ macro_rules! generate_parse_arg {
 
 pub fn parse_arg_option_value(ty: &Type) -> syn::Result<TokenStream> {
     let name = util::type_to_string(ty);
-    generate_parse_arg!(name, ApplicationCommandInteractionDataOptionValue, ty)
+    let mut parsed_arg = generate_parse_arg!(name, ApplicationCommandInteractionDataOptionValue, ty)?;
+
+    if name == "User" {
+        parsed_arg.extend(quote!((val, _)));
+    } else {
+        parsed_arg.extend(quote!((val)));
+    }
+
+    Ok(parsed_arg)
 }
 
 pub fn parse_arg_option_type(ty: &Type) -> syn::Result<TokenStream> {
@@ -106,7 +116,7 @@ pub fn generate_args(args: &[Argument]) -> syn::Result<Vec<TokenStream>> {
         let option_value = parse_arg_option_value(arg_type)?;
 
         let quote_required = quote! {
-            let #arg_name = if let #option_value(val) = interaction
+            let #arg_name = if let #option_value = interaction
                 .data
                 .options
                 .get(#idx)
@@ -123,7 +133,7 @@ pub fn generate_args(args: &[Argument]) -> syn::Result<Vec<TokenStream>> {
         let quote_optional = quote! {
             let #arg_name = if let Some(#arg_name) = interaction.data.options.get(#idx) {
                 if let Some(option) = &#arg_name.resolved {
-                    if let #option_value(val) = option {
+                    if let #option_value = option {
                         Some(val)
                     } else {
                         None

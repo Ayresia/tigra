@@ -124,7 +124,7 @@ pub fn generate_args(args: &[Argument]) -> syn::Result<Vec<TokenStream>> {
             let #arg_name = if let Some(#arg_name) = interaction.data.options.get(#idx) {
                 if let Some(option) = &#arg_name.resolved {
                     if let #option_value(val) = option {
-                        (val)
+                        Some(val)
                     } else {
                         None
                     }

@@ -60,7 +60,7 @@ pub fn check_option_inputs<'a>(name: &'a str, description: &'a str) {
     );
 
     assert!(
-        !(name.trim().len() > 32),
+        name.trim().len() <= 32,
         "Option name must be less than 32 characters"
     );
 
@@ -69,7 +69,7 @@ pub fn check_option_inputs<'a>(name: &'a str, description: &'a str) {
         "Option description must be atleast a character long"
     );
     assert!(
-        !(description.trim().len() > 100),
+        description.trim().len() <= 100,
         "Option description must be less than 100 characters"
     );
 }

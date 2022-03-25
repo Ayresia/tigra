@@ -1,7 +1,7 @@
+use crate::util::{self, option_to_type};
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use syn::{punctuated::Punctuated, token::Comma, FnArg, Type, TypePath};
-use crate::util;
 
 pub struct Argument<'a> {
     pub ident: &'a Ident,
@@ -28,7 +28,12 @@ pub fn parse_args(fn_args: &Punctuated<FnArg, Comma>) -> syn::Result<Vec<Argumen
             let ty = match pat_type {
                 Type::Path(ty_path) => {
                     option = check_path_option(ty_path);
-                    pat_type
+
+                    if option {
+                        option_to_type(pat_type)
+                    } else {
+                        pat_type
+                    }
                 }
                 Type::Reference(ty_ref) => {
                     is_ref = true;
@@ -95,13 +100,12 @@ pub fn generate_args(args: &[Argument]) -> syn::Result<Vec<TokenStream>> {
         return Ok(test_vec);
     }
 
-    // TODO: check for optional fields
     for (idx, arg) in args.iter().enumerate() {
         let arg_name = arg.ident;
         let arg_type = arg.ty;
         let option_value = parse_arg_option_value(arg_type)?;
 
-        let quote = quote! {
+        let quote_required = quote! {
             let #arg_name = if let #option_value(val) = interaction
                 .data
                 .options
@@ -116,7 +120,28 @@ pub fn generate_args(args: &[Argument]) -> syn::Result<Vec<TokenStream>> {
             };
         };
 
-        test_vec.push(quote);
+        let quote_optional = quote! {
+            let #arg_name = if let Some(#arg_name) = interaction.data.options.get(#idx) {
+                if let Some(option) = &#arg_name.resolved {
+                    if let #option_value(val) = option {
+                        (val)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+        };
+
+        if arg.option {
+            test_vec.push(quote_optional);
+            continue;
+        }
+
+        test_vec.push(quote_required);
     }
 
     Ok(test_vec)

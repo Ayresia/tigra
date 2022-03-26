@@ -30,7 +30,13 @@ pub fn parse_args(fn_args: &Punctuated<FnArg, Comma>) -> syn::Result<Vec<Argumen
                     option = check_path_option(ty_path);
 
                     if option {
-                        option_to_type(pat_type)
+                        let ty = option_to_type(pat_type);
+
+                        if let Type::Reference(ty_ref) = ty {
+                            &*ty_ref.elem
+                        } else {
+                            ty
+                        }
                     } else {
                         pat_type
                     }
@@ -103,11 +109,12 @@ pub fn parse_arg_option_type(ty: &Type) -> syn::Result<TokenStream> {
     generate_parse_arg!(name, ApplicationCommandOptionType, ty)
 }
 
-pub fn generate_args(args: &[Argument]) -> syn::Result<Vec<TokenStream>> {
-    let mut test_vec = vec![];
+pub fn generate_args<'a>(args: &'a [Argument]) -> syn::Result<(Vec<&'a Ident>, Vec<TokenStream>)> {
+    let mut idents = vec![];
+    let mut tokens = vec![];
 
     if args.is_empty() {
-        return Ok(test_vec);
+        return Ok((idents, tokens));
     }
 
     for (idx, arg) in args.iter().enumerate() {
@@ -146,15 +153,17 @@ pub fn generate_args(args: &[Argument]) -> syn::Result<Vec<TokenStream>> {
             };
         };
 
+        idents.push(arg_name);
+
         if arg.option {
-            test_vec.push(quote_optional);
+            tokens.push(quote_optional);
             continue;
         }
 
-        test_vec.push(quote_required);
+        tokens.push(quote_required);
     }
 
-    Ok(test_vec)
+    Ok((idents, tokens))
 }
 
 fn check_path_option(ty_path: &TypePath) -> bool {

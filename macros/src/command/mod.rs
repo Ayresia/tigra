@@ -5,15 +5,15 @@ use self::argument::{parse_arg_option_type, Argument};
 use argument::generate_args;
 use info::Info;
 use proc_macro2::TokenStream;
-use quote::quote;
-use syn::{Attribute, Block, Error, ItemFn, Lit, Meta, MetaNameValue};
+use quote::{quote, format_ident};
+use syn::{Attribute, Error, ItemFn, Lit, Meta, MetaNameValue, Visibility};
 
 pub fn parse(input: ItemFn) -> syn::Result<TokenStream> {
     let ItemFn {
         attrs,
-        sig,
-        mut block,
-        ..
+        mut sig,
+        block,
+        mut vis
     } = input;
 
     let mut info = Info::default();
@@ -23,14 +23,18 @@ pub fn parse(input: ItemFn) -> syn::Result<TokenStream> {
     let ident = sig.ident.clone();
     let name = sig.ident.to_string();
 
+
     if sig.asyncness.is_none() {
         return Err(Error::new_spanned(sig, "Function must be asynchronus"));
     }
 
-    let args = argument::parse_args(&sig.inputs)?;
-    let (closure_args, args) = args.split_at(2);
+    vis = Visibility::Inherited;
+    sig.ident = format_ident!("invoke");
 
-    let fn_closure = generate_closure(&mut block, closure_args, args)?;
+    let args = argument::parse_args(&sig.inputs)?;
+    let (_, args) = args.split_at(2); // TODO: remove tuple
+
+    let fn_closure = generate_closure(args)?;
     let options = generate_options(args)?;
 
     Ok(quote! {
@@ -38,6 +42,8 @@ pub fn parse(input: ItemFn) -> syn::Result<TokenStream> {
             tigra::command::Command::new(#name, #description, #fn_closure)
             #(#options)*
         }
+
+        #vis #sig #block
     })
 }
 
@@ -62,31 +68,15 @@ fn generate_options(args: &[Argument]) -> syn::Result<Vec<TokenStream>> {
 }
 
 fn generate_closure(
-    block: &mut Block,
-    closure_args: &[argument::Argument],
     args: &[argument::Argument],
 ) -> syn::Result<TokenStream> {
-    let closure_args: Vec<TokenStream> = closure_args
-        .iter()
-        .map(|arg| {
-            let ident = &arg.ident;
-            let ty = arg.ty;
-
-            if arg.reference {
-                return quote!(#ident: &#ty);
-            }
-
-            quote!(#ident: #ty)
-        })
-        .collect();
-
-    let generated_args = generate_args(args)?;
+    let (idents, tokens) = generate_args(args)?;
 
     Ok(quote! {
-        |#(#closure_args,)*| {
+        |ctx, interaction| {
             Box::pin(async move {
-                #(#generated_args)*
-                #block
+                #(#tokens)*
+                invoke(ctx, &interaction, #( #idents, )*).await;
             })
         }
     })
@@ -96,6 +86,7 @@ fn parse_attributes(attrs: &[Attribute], command_info: &mut Info) -> syn::Result
     for attr in attrs {
         let ident = attr.path.get_ident().unwrap();
         let name = ident.to_string();
+
         if name.as_str() == "description" {
             let meta = attr.parse_meta()?;
             command_info.description = parse_description(&meta)?;

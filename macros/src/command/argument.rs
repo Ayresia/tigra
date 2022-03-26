@@ -13,7 +13,7 @@ pub struct Argument<'a> {
 pub fn parse_args(fn_args: &Punctuated<FnArg, Comma>) -> syn::Result<Vec<Argument>> {
     let mut tmp = Vec::new();
 
-    for arg in fn_args {
+    for arg in fn_args.iter().skip(2) {
         if let FnArg::Typed(pat_type) = arg {
             let mut is_ref = false;
             let mut option = false;

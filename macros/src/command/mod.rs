@@ -32,10 +32,8 @@ pub fn parse(input: ItemFn) -> syn::Result<TokenStream> {
     sig.ident = format_ident!("invoke");
 
     let args = argument::parse_args(&sig.inputs)?;
-    let (_, args) = args.split_at(2); // TODO: remove tuple
-
-    let fn_closure = generate_closure(args)?;
-    let options = generate_options(args)?;
+    let fn_closure = generate_closure(&args)?;
+    let options = generate_options(&args)?;
 
     Ok(quote! {
         pub fn #ident<'a>() -> tigra::command::Command<'a> {

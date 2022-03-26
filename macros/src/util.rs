@@ -6,7 +6,7 @@ pub fn type_to_string(ty: &Type) -> String {
         let ident = path.get_ident().expect("Unable to get ident");
         ident.to_string()
     } else {
-        unimplemented!("type_to_string");
+        unimplemented!();
     }
 }
 
